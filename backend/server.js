@@ -10,7 +10,10 @@ const responseRoutes = require('./routes/responseRoutes');
 const app = express();
 
 const _dirname = path.resolve();
-app.use(cors());
+app.use(cors({
+  origin : "https://formbuilder-1-domz.onrender.com",
+  credentials: true
+}));
 app.use(express.json({ limit: '10mb' }));
 
 app.use('/api/forms', formRoutes);
