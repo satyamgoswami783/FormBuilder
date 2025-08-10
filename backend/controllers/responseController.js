@@ -4,7 +4,7 @@ exports.submitResponse = async (req, res) => {
   try {
     const { formId, answers, respondent, metadata } = req.body;
 
-    // Basic validation
+   
     if (!formId || !answers) {
       return res.status(400).json({ 
         success: false,
@@ -12,7 +12,7 @@ exports.submitResponse = async (req, res) => {
       });
     }
 
-    // Create structured response document
+    
     const response = new Response({
       formId,
       respondent: respondent || 'anonymous',
@@ -24,7 +24,7 @@ exports.submitResponse = async (req, res) => {
       metadata: metadata || {}
     });
 
-    // Save to database
+    
     await response.save();
 
     res.status(201).json({

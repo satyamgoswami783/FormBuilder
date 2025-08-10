@@ -10,7 +10,7 @@ const responseRoutes = require('./routes/responseRoutes');
 const app = express();
 
 const _dirname = path.resolve();
-// In your server.js file, update CORS:
+
 app.use(cors({
   
  origin: "https://formbuilder-2-6e62.onrender.com/" ,
@@ -22,9 +22,9 @@ app.use(express.json({ limit: '10mb' }));
 app.use('/api/forms', formRoutes);
 app.use('/api/responses', responseRoutes);
 
-// app.get('/', (req, res) => res.send('API Running'));
 
-app.use(express.static(path.join(_dirname, 'frontend', 'build')));  // Changed dist → build
+
+app.use(express.static(path.join(_dirname, 'frontend', 'build')));  
 app.get('*', (req, res) => {
   res.sendFile(path.resolve(_dirname, 'frontend', 'build', 'index.html'));
 });
