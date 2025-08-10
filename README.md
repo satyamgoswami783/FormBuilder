@@ -1,147 +1,73 @@
-# Custom Form Builder (MERN Stack, Bootstrap)
+# Custom Form Builder (MERN Stack)
 
-## Overview
 
-The Custom Form Builder is a web application that allows users to create, edit, preview, and fill out forms with three unique question types: Categorize, Cloze, and Comprehension. The application is built using the MERN stack (MongoDB, Express.js, React.js, Node.js) and features a responsive UI inspired by Typeform and Paperform.
 
-## Features
+A responsive web application for creating, previewing, and filling forms with three unique question types. Built with the MERN stack (MongoDB, Express.js, React.js, Node.js) and Bootstrap.
 
-- Create and edit forms with a user-friendly interface.
-- Support for three question types: 
-  - **Categorize**: Users can categorize items.
-  - **Cloze**: Fill in the blanks in a given text.
-  - **Comprehension**: Answer questions based on a provided passage.
-- Add a header image to the form and images to individual questions.
-- Save forms and responses to MongoDB Atlas.
-- Preview and fill forms via unique links.
+## ✨ Features
 
-## Tech Stack
+### Form Creation
+- Intuitive form editor with live preview
+- Three specialized question types:
+  - **Categorize**: Drag-and-drop items into categories
+  - **Cloze**: Interactive fill-in-the-blank exercises
+  - **Comprehension**: Reading passages with multiple-choice questions
+- Rich media support (images for headers and questions)
+- Form validation and error handling
 
-- **Frontend**: React.js, Bootstrap
-- **Backend**: Node.js, Express.js
-- **Database**: MongoDB Atlas
-- **Image Upload**: Base64 (for beginners; cloud upload can be added later)
+### User Experience
+- Question navigation sidebar
+- Submission confirmation screen
+- Form listing and management
 
-## Folder Structure
+## 🛠 Tech Stack
 
-```
-custom-form-builder/
-  backend/
-    controllers/
-    models/
-    routes/
-    .env
-    server.js
-    package.json
-  frontend/
-    public/
-    src/
-      components/
-      App.js
-      api.js
-      index.js
-    package.json
-  README.md
-```
+**Frontend**  
+- React.js (Functional Components with Hooks)
+- React Router for navigation
+- Bootstrap 5 for responsive UI
+- react-beautiful-dnd for drag-and-drop
+- Axios for API calls
 
-## Getting Started
+**Backend**  
+- Node.js with Express.js
+- MongoDB Atlas (Cloud Database)
+- Mongoose ODM
+
+**Deployment**  
+- on Render
+
+
+## 🚀 Getting Started
 
 ### Prerequisites
-
-- Node.js and npm installed on your machine.
-- MongoDB Atlas account for database hosting.
+- Node.js (v16+ recommended)
+- npm (v8+ recommended)
+- MongoDB Atlas account
 
 ### Installation
 
-1. Clone the repository:
-   ```
-   git clone <repository-url>
+1. **Clone the repository**
+   
+   git clone https://github.com/Jash-1th/FormBuilder.git
    cd custom-form-builder
-   ```
-
-2. Set up the backend:
-   - Navigate to the backend directory:
-     ```
-     cd backend
-     ```
-   - Install dependencies:
-     ```
-     npm install
-     ```
-   - Create a `.env` file and add your MongoDB connection string:
-     ```
-     MONGO_URI=mongodb+srv://<username>:<password>@cluster0.mongodb.net/formbuilder
-     PORT=5000
-     ```
-
-3. Start the backend server:
-   ```
-   node server.js
-   ```
-
-4. Set up the frontend:
-   - Navigate to the frontend directory:
-     ```
-     cd ../frontend
-     ```
-   - Install dependencies:
-     ```
-     npm install
-     ```
-   - Start the frontend application:
-     ```
-     npm start
-     ```
-
-### Running the Application
-
-- The backend will run at `http://localhost:5000`.
-- The frontend will run at `http://localhost:3000`.
-
-## Deployment
-
-### Backend
-
-- Push the backend code to a GitHub repository.
-- Use a platform like Render to deploy the backend:
-  - Create a new Web Service and connect your repository.
-  - Set environment variables (MONGO_URI, PORT).
-  - Deploy.
-
-### Frontend
-
-- In `frontend/package.json`, set the homepage:
-  ```
-  "homepage": "https://<your-frontend-domain>"
-  ```
-- In `frontend/.env`, set the API URL:
-  ```
-  REACT_APP_API_URL=https://<your-backend-domain>/api
-  ```
-- Push the frontend code to a GitHub repository.
-- Deploy on platforms like Netlify or Vercel.
-
-## Dependencies
-
-### Backend
-
-- express
-- mongoose
-- cors
-- dotenv
-
-### Frontend
-
-- react
-- react-dom
-- react-router-dom
-- axios
-- bootstrap
-
-## Reference
-
-For a demonstration of the application, please refer to the following video: [Assignment demo](https://www.loom.com/share/17c1ea4e9b4d4829b453c5e9eae8aedf?sid=1c2ee81f-b194-4bc6-a058-ec3c47c4707a).
-
-## Contributing
-
-Feel free to fork the repository and submit pull requests for any improvements or features you would like to add!
+2. **Set up backend**
+   cd backend
+   npm install
+   set in .env  # Update with your MongoDB credentials
+3. **Set up frontend**
+   cd ../frontend
+   npm  install
+# Running Locally
+1. **Start backend server**
+   npm start
+``` bash
+Server runs on http://localhost:5000
+```
+2. **Start frontend**
+  npm start
+``` bash
+App opens at http://localhost:3000
+```
+# Live Demo
+Experience the deployed application: https://formbuilder-2-6e62.onrender.com
