@@ -29,11 +29,17 @@ function TestCompleted() {
   );
 }
 
+// Helper function to sanitize keys for MongoDB
+const sanitizeKey = (key) => {
+  return key.replace(/\./g, '_dot_');
+};
+
 export default function FillForm() {
   const { formId } = useParams();
   const [form, setForm] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [submitError, setSubmitError] = useState(null);
 
   // Categorize state
   const [catAssignments, setCatAssignments] = useState({});
@@ -62,11 +68,15 @@ export default function FillForm() {
         const { data } = await axios.get(`/api/forms/${formId}`);
         setForm(data);
 
-        // Initialize Categorize state
+        // Initialize Categorize state with unique IDs
         const catQ = data?.questions?.[0];
-        setCatUnassigned(catQ?.items?.map(item => ({ ...item })) || []);
+        setCatUnassigned(catQ?.items?.map((item, idx) => ({ 
+          ...item, 
+          id: `${item.value}-${idx}` 
+        })) || []);
+        
         setCatAssignments(
-          Object.fromEntries((catQ?.categories || []).map(cat => [cat, []]))
+          Object.fromEntries((catQ?.categories || []).map(cat => [sanitizeKey(cat), []]))
         );
 
         // Initialize Cloze state
@@ -74,7 +84,10 @@ export default function FillForm() {
         if (clozeQ) {
           setBlankPositions(clozeQ.blankPositions || []);
           setClozeBlanks(clozeQ.clozeAnswers?.map(() => null) || []);
-          setClozeUnfilled(clozeQ.clozeAnswers?.map(a => a) || []);
+          setClozeUnfilled(clozeQ.clozeAnswers?.map((word, idx) => ({
+            word,
+            id: `${word}-${idx}`
+          })) || []);
         }
 
         // Initialize MCQ state
@@ -96,30 +109,37 @@ export default function FillForm() {
     if (!result.destination) return;
     const { source, destination, draggableId } = result;
 
+    const findItemById = (items, id) => items.find(item => item.id === id);
+
     if (source.droppableId === "unassigned") {
-      const item = catUnassigned.find(it => it.value === draggableId);
-      setCatUnassigned(catUnassigned.filter(it => it.value !== draggableId));
+      const item = findItemById(catUnassigned, draggableId);
+      if (!item) return;
+      
+      setCatUnassigned(catUnassigned.filter(it => it.id !== draggableId));
       setCatAssignments(prev => ({
         ...prev,
         [destination.droppableId]: [...(prev[destination.droppableId] || []), item]
       }));
     } else if (destination.droppableId === "unassigned") {
-      const item = catAssignments[source.droppableId].find(it => it.value === draggableId);
+      const item = findItemById(catAssignments[source.droppableId], draggableId);
+      if (!item) return;
+      
       setCatAssignments(prev => ({
         ...prev,
-        [source.droppableId]: prev[source.droppableId].filter(it => it.value !== draggableId)
+        [source.droppableId]: prev[source.droppableId].filter(it => it.id !== draggableId)
       }));
       setCatUnassigned(prev => [...prev, item]);
     } else if (source.droppableId !== destination.droppableId) {
-      const item = catAssignments[source.droppableId].find(it => it.value === draggableId);
+      const item = findItemById(catAssignments[source.droppableId], draggableId);
+      if (!item) return;
+      
       setCatAssignments(prev => ({
         ...prev,
-        [source.droppableId]: prev[source.droppableId].filter(it => it.value !== draggableId),
+        [source.droppableId]: prev[source.droppableId].filter(it => it.id !== draggableId),
         [destination.droppableId]: [...(prev[destination.droppableId] || []), item]
       }));
     }
 
-    // Update answered status
     const totalAssigned = Object.values(catAssignments).flat().length;
     const catQ = form?.questions?.[0];
     const allItemsAssigned = (totalAssigned + catUnassigned.length) === (catQ?.items?.length || 0) && totalAssigned > 0;
@@ -134,17 +154,18 @@ export default function FillForm() {
     let newBlanks = [...clozeBlanks];
     let newUnfilled = [...clozeUnfilled];
 
-    const word = draggableId.split('-')[0]; // Extract word from draggableId
+    const draggedWord = newUnfilled.find(w => w.id === draggableId);
+    if (!draggedWord) return;
 
     if (source.droppableId === "cloze-unfilled" && destination.droppableId.startsWith("cloze-blank-")) {
       const blankIdx = parseInt(destination.droppableId.replace("cloze-blank-", ""));
       
       if (newBlanks[blankIdx]) {
-        newUnfilled.push(newBlanks[blankIdx]);
+        newUnfilled.push({ word: newBlanks[blankIdx].word, id: newBlanks[blankIdx].id });
       }
       
-      newBlanks[blankIdx] = word;
-      newUnfilled = newUnfilled.filter(w => w !== word);
+      newBlanks[blankIdx] = draggedWord;
+      newUnfilled = newUnfilled.filter(w => w.id !== draggableId);
     } else if (source.droppableId.startsWith("cloze-blank-") && destination.droppableId === "cloze-unfilled") {
       const blankIdx = parseInt(source.droppableId.replace("cloze-blank-", ""));
       if (newBlanks[blankIdx]) {
@@ -167,11 +188,11 @@ export default function FillForm() {
     });
     
     setAnswered(prev => {
-      const newMcqAnswers = [...prev];
-      newMcqAnswers[2] = mcqAnswers.every((ans, i) => 
+      const newAnswered = [...prev];
+      newAnswered[2] = mcqAnswers.every((ans, i) => 
         i === qIndex ? optionIndex !== null : ans !== null
       );
-      return [prev[0], prev[1], newMcqAnswers[2]];
+      return newAnswered;
     });
   };
 
@@ -182,26 +203,58 @@ export default function FillForm() {
     return [0, 1, 2];
   };
 
-  // Handle form submission
+  // Handle form submission with proper error handling
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSubmitError(null);
+    
     if (!answered.every(Boolean)) {
-      alert("Please complete all questions before submitting");
+      setSubmitError("Please complete all questions before submitting");
       return;
     }
 
     try {
-      await axios.post('/api/responses', { 
+      // Prepare data with sanitized keys
+      const submissionData = {
         formId,
         answers: {
-          categorize: catAssignments,
-          cloze: clozeBlanks,
+          categorize: Object.fromEntries(
+            Object.entries(catAssignments).map(([cat, items]) => [
+              sanitizeKey(cat), 
+              items.map(item => item.value)
+            ])
+          ),
+          cloze: clozeBlanks.map(b => b?.word || ""),
           comprehension: mcqAnswers
         }
+      };
+
+      const response = await axios.post('/api/responses', submissionData, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
-      setSubmitted(true);
+
+      if (response.data.success) {
+        setSubmitted(true);
+      } else {
+        setSubmitError(response.data.message || "Submission failed");
+      }
     } catch (err) {
-      alert("Submission failed: " + (err.response?.data?.message || err.message));
+      console.error("Submission error:", err);
+      let errorMessage = "Submission failed";
+      
+      if (err.response) {
+        errorMessage = err.response.data?.message || 
+                      err.response.data?.error || 
+                      `Server error (${err.response.status})`;
+      } else if (err.request) {
+        errorMessage = "No response from server. Please check your connection.";
+      } else {
+        errorMessage = err.message;
+      }
+      
+      setSubmitError(errorMessage);
     }
   };
 
@@ -237,7 +290,7 @@ export default function FillForm() {
                           className="d-flex flex-wrap gap-2 p-2 bg-light rounded"
                         >
                           {catUnassigned.map((item, idx) => (
-                            <Draggable key={item.value} draggableId={item.value} index={idx}>
+                            <Draggable key={item.id} draggableId={item.id} index={idx}>
                               {(provided) => (
                                 <div
                                   ref={provided.innerRef}
@@ -258,7 +311,10 @@ export default function FillForm() {
 
                   <div className="d-flex flex-wrap gap-3 mt-4">
                     {catQ.categories.map((category, i) => (
-                      <Droppable droppableId={category} key={category}>
+                      <Droppable 
+                        key={category} 
+                        droppableId={sanitizeKey(category)}
+                      >
                         {(provided) => (
                           <div
                             ref={provided.innerRef}
@@ -270,8 +326,8 @@ export default function FillForm() {
                             }}
                           >
                             <h6 className="text-center mb-2">{category}</h6>
-                            {(catAssignments[category] || []).map((item, idx) => (
-                              <Draggable key={item.value} draggableId={item.value} index={idx}>
+                            {(catAssignments[sanitizeKey(category)] || []).map((item, idx) => (
+                              <Draggable key={item.id} draggableId={item.id} index={idx}>
                                 {(provided) => (
                                   <div
                                     ref={provided.innerRef}
@@ -308,8 +364,12 @@ export default function FillForm() {
                           {...provided.droppableProps}
                           className="d-flex flex-wrap gap-2 p-2 bg-light rounded"
                         >
-                          {clozeUnfilled.map((word, idx) => (
-                            <Draggable key={`${word}-${idx}`} draggableId={`${word}-${idx}`} index={idx}>
+                          {clozeUnfilled.map((wordObj, idx) => (
+                            <Draggable 
+                              key={wordObj.id} 
+                              draggableId={wordObj.id} 
+                              index={idx}
+                            >
                               {(provided) => (
                                 <div
                                   ref={provided.innerRef}
@@ -317,7 +377,7 @@ export default function FillForm() {
                                   {...provided.dragHandleProps}
                                   className="px-3 py-2 bg-primary text-white rounded"
                                 >
-                                  {word}
+                                  {wordObj.word}
                                 </div>
                               )}
                             </Draggable>
@@ -344,7 +404,10 @@ export default function FillForm() {
                                 style={{ minWidth: "80px" }}
                               >
                                 {clozeBlanks[blankIdx] ? (
-                                  <Draggable draggableId={`${clozeBlanks[blankIdx]}-${blankIdx}`} index={0}>
+                                  <Draggable 
+                                    draggableId={clozeBlanks[blankIdx].id} 
+                                    index={0}
+                                  >
                                     {(provided) => (
                                       <span
                                         ref={provided.innerRef}
@@ -352,7 +415,7 @@ export default function FillForm() {
                                         {...provided.dragHandleProps}
                                         className="px-2 py-1 bg-light rounded"
                                       >
-                                        {clozeBlanks[blankIdx]}
+                                        {clozeBlanks[blankIdx].word}
                                       </span>
                                     )}
                                   </Draggable>
@@ -402,8 +465,13 @@ export default function FillForm() {
               </div>
             </div>
 
-            {/* Submit Button */}
+            {/* Submit Button with Error Display */}
             <div className="text-center my-4">
+              {submitError && (
+                <div className="alert alert-danger mb-3">
+                  {submitError}
+                </div>
+              )}
               <button
                 type="submit"
                 className="btn btn-primary btn-lg px-5"

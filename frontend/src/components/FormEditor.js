@@ -4,498 +4,581 @@ import { createForm } from "../api";
 import { useHistory } from "react-router-dom";
 
 export default function FormEditor() {
-  // Form meta
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [headerImage, setHeaderImage] = useState("");
-
-  // Preview mode
+  const [title, setTitle] = useState('');
+  const [desc, setDesc] = useState('');
+  const [headerImg, setHeaderImg] = useState(null);
   const [showPreview, setShowPreview] = useState(false);
-
-  // Categorize
+  
+  // Categorize question states
   const [catText, setCatText] = useState("");
-  const [catImage, setCatImage] = useState("");
-  const [categories, setCategories] = useState([{ value: "" }]);
-  const [items, setItems] = useState([{ value: "", belongsTo: "" }]);
-
-  // Cloze
-  const [clozeSentence, setClozeSentence] = useState("");
-  const [clozeAnswers, setClozeAnswers] = useState([]);
-  const [selectedWord, setSelectedWord] = useState("");
-  const [selectedWordIndex, setSelectedWordIndex] = useState(null);
-  const [showAddAnswer, setShowAddAnswer] = useState(false);
-  const [manualAnswer, setManualAnswer] = useState("");
-  const [blankPositions, setBlankPositions] = useState([]);
-
-  // Comprehension
+  const [catImg, setCatImg] = useState("");
+  const [categories, setCategories] = useState([{ name: "" }]);
+  const [items, setItems] = useState([{ text: "", category: "" }]);
+  
+  // Cloze question states
+  const [sentence, setSentence] = useState("");
+  const [blanks, setBlanks] = useState([]);
+  const [answers, setAnswers] = useState([]);
+  const [selected, setSelected] = useState({ word: "", index: null });
+  
+  // Comprehension states
   const [passage, setPassage] = useState("");
-  const [compQuestions, setCompQuestions] = useState([
-    { question: "", options: ["", ""], correct: 0 },
+  const [questions, setQuestions] = useState([
+    { 
+      question: "", 
+      choices: ["", ""],
+      answer: 0
+    }
   ]);
 
+  const [showCategoryVideo, setShowCategoryVideo] = useState(false);
   const history = useHistory();
 
-  // Image handler
-  const handleImage = (e, setter) => {
+  const uploadImage = (e, callback) => {
     const file = e.target.files[0];
     if (!file) return;
+    
     const reader = new FileReader();
-    reader.onload = () => setter(reader.result);
+    reader.onload = (event) => callback(event.target.result);
     reader.readAsDataURL(file);
   };
 
-  // ========== Categorize ==========
-  const handleCategoryChange = (idx, value) => {
-    setCategories(categories.map((cat, i) => (i === idx ? { value } : cat)));
+  // Category functions
+  const updateCategory = (idx, val) => {
+    const updated = [...categories];
+    updated[idx] = { ...updated[idx], name: val };
+    setCategories(updated);
   };
-  const addCategory = () => setCategories([...categories, { value: "" }]);
-  const removeCategory = (idx) => setCategories(categories.filter((_, i) => i !== idx));
-  const safeCategory = (catVal) => categories.find((cat) => cat.value === catVal) ? catVal : "";
-  const handleItemChange = (idx, value) => {
-    setItems(items.map((it, i) => (i === idx ? { ...it, value } : it)));
-  };
-  const handleItemBelongsToChange = (idx, belongsTo) => {
-    setItems(items.map((it, i) => (i === idx ? { ...it, belongsTo } : it)));
-  };
-  const addItem = () => setItems([...items, { value: "", belongsTo: "" }]);
-  const removeItem = (idx) => setItems(items.filter((_, i) => i !== idx));
 
-  // ========== Cloze ==========
-  const handleClozeWordSelect = () => {
-    if (selectedWord && selectedWordIndex !== null) {
-      if (!blankPositions.includes(selectedWordIndex)) {
-        setBlankPositions([...blankPositions, selectedWordIndex]);
+  const addNewCategory = () => {
+    setCategories([...categories, { name: "" }]);
+  };
+
+  const removeCategory = (idx) => {
+    const newItems = items.map(item => {
+      if (item.category === categories[idx].name) {
+        return { ...item, category: "" };
       }
-      if (!clozeAnswers.includes(selectedWord)) {
-        setClozeAnswers([...clozeAnswers, selectedWord]);
+      return item;
+    });
+    setItems(newItems);
+    setCategories(categories.filter((_, i) => i !== idx));
+  };
+
+  // Item functions
+  function handleItemTextChange(idx, val) {
+    const newItems = [...items];
+    newItems[idx].text = val;
+    setItems(newItems);
+  }
+
+  function handleItemCategory(idx, cat) {
+    const updated = [...items];
+    updated[idx].category = cat;
+    setItems(updated);
+  }
+
+  const removeItem = (idx) => {
+    setItems(items.filter((_, i) => i !== idx));
+  };
+
+  // Cloze functions
+  const markBlank = () => {
+    if (selected.word && selected.index !== null) {
+      if (!blanks.includes(selected.index)) {
+        setBlanks([...blanks, selected.index].sort((a, b) => a - b));
       }
+      setAnswers([...answers, { 
+        word: selected.word, 
+        position: selected.index,
+        id: `${selected.word}-${selected.index}-${Date.now()}`
+      }]);
     }
-    setSelectedWord("");
-    setSelectedWordIndex(null);
+    setSelected({ word: "", index: null });
   };
 
-  const handleAddManualAnswer = () => {
-    const word = manualAnswer.trim();
-    if (word) {
-      const words = clozeSentence.split(" ");
-      const index = words.findIndex(w => w === word);
-      if (index !== -1) {
-        if (!blankPositions.includes(index)) {
-          setBlankPositions([...blankPositions, index]);
-        }
-        if (!clozeAnswers.includes(word)) {
-          setClozeAnswers([...clozeAnswers, word]);
-        }
+  const removeBlank = (id) => {
+    const answerToRemove = answers.find(a => a.id === id);
+    if (!answerToRemove) return;
+    
+    setBlanks(blanks.filter(pos => pos !== answerToRemove.position));
+    setAnswers(answers.filter(a => a.id !== id));
+  };
+
+  const getGroupedAnswers = () => {
+    const grouped = {};
+    answers.forEach(answer => {
+      if (!grouped[answer.word]) {
+        grouped[answer.word] = [];
       }
-      setManualAnswer("");
-      setShowAddAnswer(false);
-    }
+      grouped[answer.word].push(answer);
+    });
+    return grouped;
   };
 
-  const handleRemoveClozeAnswer = (idx) => {
-    const word = clozeAnswers[idx];
-    setClozeAnswers(clozeAnswers.filter((_, i) => i !== idx));
-    setBlankPositions(blankPositions.filter(pos => {
-      return clozeSentence.split(" ")[pos] !== word;
-    }));
+  const renderClozePreview = () => {
+    if (!sentence) return <span className="text-muted">No sentence yet...</span>;
+    
+    return sentence.split(" ").map((word, i) => {
+      if (blanks.includes(i)) {
+        const answer = answers.find(a => a.position === i);
+        return (
+          <b key={i}>
+            [<span className="text-primary">{answer?.word || '____'}</span>]
+          </b>
+        );
+      }
+      return <span key={i}> {word} </span>;
+    });
   };
 
-  const clozePreview = clozeSentence
-    ? clozeSentence.split(" ").map((word, idx) => {
-        return blankPositions.includes(idx)
-          ? <b key={idx}> ____ </b>
-          : <span key={idx}> {word} </span>;
-      })
-    : null;
-
-  // ========== Comprehension ==========
-  const handleCompQuestionChange = (idx, field, value) => {
-    setCompQuestions(
-      compQuestions.map((q, i) =>
-        i === idx ? { ...q, [field]: value } : q
+  // Comprehension functions
+  const changeQuestion = (qIdx, field, val) => {
+    setQuestions(
+      questions.map((q, i) => 
+        i === qIdx ? { ...q, [field]: val } : q
       )
     );
   };
-  const handleCompOptionChange = (qIdx, optIdx, value) => {
-    setCompQuestions(
-      compQuestions.map((q, i) =>
-        i === qIdx
-          ? {
-              ...q,
-              options: q.options.map((opt, j) =>
-                j === optIdx ? value : opt
-              ),
-            }
-          : q
-      )
-    );
-  };
-  const handleCompCorrectChange = (qIdx, correctIdx) => {
-    setCompQuestions(
-      compQuestions.map((q, i) =>
-        i === qIdx ? { ...q, correct: correctIdx } : q
-      )
-    );
-  };
-  const addCompQuestion = () => {
-    setCompQuestions([
-      ...compQuestions,
-      { question: "", options: ["", ""], correct: 0 },
+
+  function addNewQuestion() {
+    setQuestions([
+      ...questions,
+      { question: "", choices: ["", ""], answer: 0 }
     ]);
-  };
-  const removeCompQuestion = (idx) => {
-    setCompQuestions(compQuestions.filter((_, i) => i !== idx));
-  };
-  const addCompOption = (qIdx) => {
-    setCompQuestions(
-      compQuestions.map((q, i) =>
-        i === qIdx ? { ...q, options: [...q.options, ""] } : q
-      )
-    );
+  }
+
+  const removeQuestion = (idx) => {
+    setQuestions(questions.filter((_, i) => i !== idx));
   };
 
-  // ========== Preview and Save ==========
-  const formQuestions = [
-    {
-      type: "categorize",
-      text: catText,
-      image: catImage,
-      categories: categories.map((c) => c.value).filter((v) => v.trim()),
-      items: items.filter((it) => it.value.trim()).map((it) => ({
-        value: it.value,
-        belongsTo: safeCategory(it.belongsTo),
-      })),
-    },
-    {
-      type: "cloze",
-      clozeSentence,
-      clozeAnswers,
-      blankPositions,
-    },
-    {
-      type: "comprehension",
-      passage,
-      mcqs: compQuestions
-        .filter(
-          (subq) =>
-            subq.question.trim() &&
-            subq.options.filter((o) => o.trim()).length >= 2
-        )
-        .map((subq) => ({
-          question: subq.question,
-          options: subq.options,
-          correct: subq.correct,
-        })),
-    },
-  ];
-
-  const handlePreview = () => {
-    if (!title.trim()) return alert("Form Title is required!");
-    setShowPreview(true);
-  };
-
-  const handleFinalSave = async () => {
-    try {
-      await createForm({
-        title,
-        description,
-        headerImage,
-        questions: formQuestions,
-      });
-      history.push("/");
-    } catch (err) {
-      alert(
-        "Error saving form: " + (err.response?.data?.error || err.message)
-      );
+  const removeOption = (qIdx, optIdx) => {
+    const question = questions[qIdx];
+    const newChoices = question.choices.filter((_, i) => i !== optIdx);
+    let newAnswer = question.answer;
+    
+    if (optIdx === question.answer) {
+      newAnswer = 0;
+    } else if (optIdx < question.answer) {
+      newAnswer = question.answer - 1;
     }
+    
+    changeQuestion(qIdx, "choices", newChoices);
+    changeQuestion(qIdx, "answer", newAnswer);
+  };
+
+  const getFormData = () => ({
+    title,
+    description: desc,
+    headerImage: headerImg,
+    questions: [
+      {
+        type: "categorize",
+        text: catText,
+        image: catImg,
+        categories: categories.map(c => c.name).filter(Boolean),
+        items: items.filter(i => i.text.trim()).map(i => ({
+          value: i.text,
+          belongsTo: i.category
+        }))
+      },
+      {
+        type: "cloze",
+        clozeSentence: sentence,
+        clozeAnswers: answers.map(a => a.word),
+        blankPositions: blanks
+      },
+      {
+        type: "comprehension",
+        passage,
+        mcqs: questions
+          .filter(q => q.question.trim() && q.choices.filter(c => c.trim()).length >= 2)
+          .map(q => ({
+            question: q.question,
+            options: q.choices,
+            answer: q.answer
+          }))
+      }
+    ]
+  });
+
+  const showFormPreview = () => {
+    if (!title.trim()) {
+      alert("Please add a title first!");
+      return;
+    }
+    setShowPreview(true);
   };
 
   if (showPreview) {
     return (
       <FormPreview
-        title={title}
-        description={description}
-        questions={formQuestions}
+        data={getFormData()}
         onBack={() => setShowPreview(false)}
-        onSubmit={handleFinalSave}
+        onSubmit={async () => {
+          try {
+            await createForm(getFormData());
+            history.push("/");
+          } catch (err) {
+            console.error("Save error:", err);
+            alert("Oops! Couldn't save. Try again?");
+          }
+        }}
       />
     );
   }
 
+  const groupedAnswers = getGroupedAnswers();
+
   return (
-    <div className="container mt-5">
-      <h2>Create Form</h2>
-      <input
-        className="form-control mb-2"
-        placeholder="Form Title"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-      />
-      <textarea
-        className="form-control mb-2"
-        placeholder="Description"
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-      />
-      <input
-        type="file"
-        accept="image/*"
-        onChange={(e) => handleImage(e, setHeaderImage)}
-      />
-      {headerImage && (
-        <img
-          src={headerImage}
-          alt="Header"
-          style={{ maxWidth: 200, display: "block", margin: "10px 0" }}
+    <div className="container mt-4" style={{ maxWidth: "800px" }}>
+      <h2 className="mb-4">Create New Form</h2>
+      
+      {/* Basic Info Section */}
+      <div className="mb-4">
+        <label className="form-label">Form Title*</label>
+        <input
+          className="form-control mb-2"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          required
         />
-      )}
-      <hr />
-
-      {/* ================== CATEGORIZE ================== */}
-      <h4>1. Categorize</h4>
-      <input
-        className="form-control mb-2"
-        placeholder="Question Text"
-        value={catText}
-        onChange={(e) => setCatText(e.target.value)}
-      />
-      <input
-        type="file"
-        accept="image/*"
-        onChange={(e) => handleImage(e, setCatImage)}
-      />
-      {catImage && (
-        <img
-          src={catImage}
-          alt="Q"
-          style={{ maxWidth: 150, margin: "8px 0" }}
-        />
-      )}
-      <div className="row">
-        <div className="col-md-6">
-          <b>Categories</b>
-          {categories.map((cat, i) => (
-            <div key={i} className="input-group mb-1">
-              <input
-                className="form-control"
-                value={cat.value}
-                placeholder={`Category ${i + 1}${i > 1 ? " (Optional)" : ""}`}
-                onChange={(e) => handleCategoryChange(i, e.target.value)}
-              />
-              {categories.length > 1 && (
-                <button
-                  className="btn btn-outline-danger"
-                  type="button"
-                  onClick={() => removeCategory(i)}
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          ))}
-          <button className="btn btn-link" type="button" onClick={addCategory}>
-            + Add Category
-          </button>
-        </div>
-        <div className="col-md-6">
-          <b>Items</b>
-          {items.map((it, i) => (
-            <div key={i} className="input-group mb-1">
-              <input
-                className="form-control"
-                value={it.value}
-                placeholder={`Item ${i + 1}${i > 1 ? " (Optional)" : ""}`}
-                onChange={(e) => handleItemChange(i, e.target.value)}
-              />
-              <select
-                className="form-select"
-                value={it.belongsTo}
-                onChange={(e) =>
-                  handleItemBelongsToChange(i, e.target.value)
-                }
-              >
-                <option value="">Belongs To...</option>
-                {categories
-                  .filter((c) => c.value.trim())
-                  .map((cat, j) => (
-                    <option key={j} value={cat.value}>
-                      {cat.value}
-                    </option>
-                  ))}
-              </select>
-              {items.length > 1 && (
-                <button
-                  className="btn btn-outline-danger"
-                  type="button"
-                  onClick={() => removeItem(i)}
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          ))}
-          <button className="btn btn-link" type="button" onClick={addItem}>
-            + Add Item
-          </button>
-        </div>
       </div>
+
+      <div className="mb-4">
+        <label className="form-label">Description</label>
+        <textarea
+          className="form-control mb-2"
+          value={desc}
+          onChange={(e) => setDesc(e.target.value)}
+          rows={3}
+        />
+      </div>
+
+      {/* Header Image */}
+      <div className="mb-4">
+        <label className="form-label">Header Image (Optional)</label>
+        <input
+          type="file"
+          className="form-control"
+          accept="image/*"
+          onChange={(e) => uploadImage(e, setHeaderImg)}
+        />
+      </div>
+
       <hr />
 
-      {/* ================== CLOZE ================== */}
-      <h4>2. Cloze</h4>
-      <div className="mb-3" style={{ border: "1px solid #e3e3e3", borderRadius: 8, padding: 16, background: "#fafbfd" }}>
-        <div>
-          <b>Preview:</b>
-          <div style={{ background: "#fff", border: "1px solid #eee", padding: 8, borderRadius: 6, marginBottom: 6 }}>
-            {clozePreview}
-          </div>
-        </div>
-        <div>
-          <label className="form-label">Sentence*</label>
-          <textarea
-            className="form-control mb-2"
-            value={clozeSentence}
-            onChange={e => setClozeSentence(e.target.value)}
-            rows={2}
-            placeholder="Type the full sentence here"
+      {/* Categorize Section */}
+      <div className="mb-4">
+        <h4>1. Categorization Question</h4>
+        {!showCategoryVideo && (
+          <button 
+            className="btn btn-outline-info mb-3"
+            onClick={() => setShowCategoryVideo(!showCategoryVideo)}
+          >
+            Know about Categorization question
+          </button>
+        )}
+        {showCategoryVideo && (
+          <>
+            <button 
+              onClick={() => setShowCategoryVideo(!showCategoryVideo)} 
+              className="btn btn-sm btn-danger mb-2"
+            >
+              Close Video
+            </button>
+            <div className="ratio ratio-16x9 mb-3">
+              <video controls style={{ borderRadius: 10, border: "1px solid #eee" }}>
+                <source src="/media/demoCat.mp4" type="video/mp4" />
+                Your browser does not support the video tag.
+              </video>
+            </div>
+          </>
+        )}
+        
+        <div className="mb-3">
+          <label className="form-label">Question Text</label>
+          <input
+            className="form-control"
+            value={catText}
+            onChange={(e) => setCatText(e.target.value)}
           />
         </div>
-        <div>
-          <label className="form-label">Select a word in the sentence to mark as blank:</label>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {clozeSentence.split(" ").filter(w => !!w).map((word, i) => (
+
+        <div className="mb-3">
+          <label className="form-label">Image (Optional)</label>
+          <input
+            type="file"
+            className="form-control"
+            accept="image/*"
+            onChange={(e) => uploadImage(e, setCatImg)}
+          />
+        </div>
+
+        <div className="row">
+          <div className="col-md-6">
+            <div className="mb-3">
+              <label className="form-label">Categories</label>
+              {categories.map((cat, i) => (
+                <div key={i} className="input-group mb-2">
+                  <input
+                    className="form-control"
+                    value={cat.name}
+                    onChange={(e) => updateCategory(i, e.target.value)}
+                    placeholder={`Category ${i+1}`}
+                  />
+                  {categories.length > 1 && (
+                    <button
+                      className="btn btn-outline-danger"
+                      onClick={() => removeCategory(i)}
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              ))}
+              <button 
+                className="btn btn-outline-primary"
+                onClick={addNewCategory}
+              >
+                Add Category
+              </button>
+            </div>
+          </div>
+
+          <div className="col-md-6">
+            <div className="mb-3">
+              <label className="form-label">Items</label>
+              {items.map((item, i) => (
+                <div key={i} className="mb-2">
+                  <div className="input-group">
+                    <input
+                      className="form-control"
+                      value={item.text}
+                      onChange={(e) => handleItemTextChange(i, e.target.value)}
+                      placeholder={`Item ${i+1}`}
+                    />
+                    {items.length > 1 && (
+                      <button
+                        className="btn btn-outline-danger"
+                        onClick={() => removeItem(i)}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                  <select
+                    className="form-select mt-1"
+                    value={item.category}
+                    onChange={(e) => handleItemCategory(i, e.target.value)}
+                  >
+                    <option value="">Select category...</option>
+                    {categories
+                      .filter(c => c.name.trim())
+                      .map((cat, j) => (
+                        <option key={j} value={cat.name}>
+                          {cat.name}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              ))}
+              <button 
+                className="btn btn-outline-primary"
+                onClick={() => setItems([...items, { text: "", category: "" }])}
+              >
+                Add Item
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr />
+
+      {/* Cloze Section */}
+      <div className="mb-4">
+        <h4>2. Fill-in-the-Blanks</h4>
+        
+        <div className="mb-3 p-3 bg-light rounded">
+          <label className="form-label">Preview:</label>
+          <div className="p-2">
+            {renderClozePreview()}
+          </div>
+        </div>
+
+        <div className="mb-3">
+          <label className="form-label">Enter Sentence</label>
+          <textarea
+            className="form-control"
+            value={sentence}
+            onChange={(e) => setSentence(e.target.value)}
+            rows={3}
+          />
+        </div>
+
+        <div className="mb-3">
+          <label className="form-label">Select Words to Blank Out</label>
+          <div className="d-flex flex-wrap gap-2 mb-3">
+            {sentence.split(" ").filter(w => w.trim()).map((word, i) => (
               <button
                 key={i}
                 type="button"
-                className={`btn btn-sm ${blankPositions.includes(i) ? "btn-secondary" : "btn-outline-primary"}`}
-                onClick={() => {
-                  setSelectedWord(word);
-                  setSelectedWordIndex(i);
-                }}
-                style={{ marginBottom: 4 }}
+                className={`btn btn-sm ${blanks.includes(i) ? "btn-secondary" : "btn-outline-primary"}`}
+                onClick={() => setSelected({ word, index: i })}
               >
                 {word}
               </button>
             ))}
           </div>
-          {selectedWord && selectedWordIndex !== null && (
-            <div className="mt-2">
-              <span>Mark "<b>{selectedWord}</b>" (position: {selectedWordIndex + 1}) as blank?</span>
-              <button type="button" className="btn btn-success btn-sm mx-2" onClick={handleClozeWordSelect}>
+
+          {selected.word && (
+            <div className="alert alert-info p-2 d-flex align-items-center">
+              <span className="me-2">Mark "<b>{selected.word}</b>" as blank?</span>
+              <button 
+                className="btn btn-sm btn-success me-1"
+                onClick={markBlank}
+              >
                 Yes
               </button>
-              <button type="button" className="btn btn-outline-danger btn-sm" onClick={() => {
-                setSelectedWord("");
-                setSelectedWordIndex(null);
-              }}>
+              <button 
+                className="btn btn-sm btn-outline-secondary"
+                onClick={() => setSelected({ word: "", index: null })}
+              >
                 Cancel
               </button>
             </div>
           )}
         </div>
-        <div className="mt-3">
-          <b>Blanks/Answers:</b>
-          <ul>
-            {clozeAnswers.map((word, idx) => (
-              <li key={idx}>
-                <span>{word}</span>
-                <button className="btn btn-link btn-sm text-danger" type="button" onClick={() => handleRemoveClozeAnswer(idx)}>Remove</button>
-              </li>
-            ))}
-          </ul>
-          {!showAddAnswer && (
-            <button className="btn btn-link" type="button" onClick={() => setShowAddAnswer(true)}>
-              + Add Answer Manually
-            </button>
-          )}
-          {showAddAnswer && (
-            <div className="input-group mb-2">
-              <input
-                className="form-control"
-                value={manualAnswer}
-                onChange={e => setManualAnswer(e.target.value)}
-                placeholder="Type answer word"
-              />
-              <button className="btn btn-success" type="button" onClick={handleAddManualAnswer}>Add</button>
-              <button className="btn btn-outline-danger" type="button" onClick={() => setShowAddAnswer(false)}>Cancel</button>
+
+        <div className="mb-3">
+          <label className="form-label">Blank Answers</label>
+          {answers.length > 0 ? (
+            <div>
+              {Object.entries(groupedAnswers).map(([word, wordAnswers]) => (
+                <div key={word} className="mb-3 p-3 border rounded">
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <strong>{word}</strong>
+                    <span className="badge bg-primary">
+                      {wordAnswers.length} blank{wordAnswers.length > 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  <div className="ms-3">
+                    {wordAnswers.map(answer => (
+                      <div key={answer.id} className="d-flex justify-content-between align-items-center mb-1">
+                        <span>Position {answer.position + 1}</span>
+                        <button 
+                          className="btn btn-sm btn-outline-danger"
+                          onClick={() => removeBlank(answer.id)}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
+          ) : (
+            <p className="text-muted">No blanks added yet</p>
           )}
         </div>
       </div>
+
       <hr />
 
-      {/* ================== COMPREHENSION ================== */}
-      <h4>3. Comprehension</h4>
-      <div className="mb-3" style={{ border: "1px solid #e3e3e3", borderRadius: 8, padding: 16, background: "#fafbfd" }}>
-        <div>
-          <label className="form-label"><b>Passage/Paragraph</b></label>
+      {/* Comprehension Section */}
+      <div className="mb-4">
+        <h4>3. Reading Comprehension</h4>
+        
+        <div className="mb-3">
+          <label className="form-label">Reading Passage</label>
           <textarea
-            className="form-control mb-3"
+            className="form-control"
             value={passage}
-            onChange={e => setPassage(e.target.value)}
+            onChange={(e) => setPassage(e.target.value)}
             rows={5}
-            placeholder="Paste or type the passage here"
           />
         </div>
-        <div>
-          <b>MCQ Questions</b>
-          {compQuestions.map((q, i) => (
-            <div key={i} className="mb-3" style={{ border: "1px solid #eee", borderRadius: 6, padding: 12, background: "#fff" }}>
-              <div className="d-flex justify-content-between align-items-center">
-                <span><b>Q{i + 1}.</b></span>
-                {compQuestions.length > 1 && (
-                  <button className="btn btn-link text-danger" onClick={() => removeCompQuestion(i)}>Remove</button>
+
+        <label className="form-label">Questions</label>
+        {questions.map((q, i) => (
+          <div key={i} className="mb-3 p-3 border rounded">
+            <div className="d-flex justify-content-between mb-2">
+              <h5>Question {i+1}</h5>
+              {questions.length > 1 && (
+                <button 
+                  className="btn btn-sm btn-outline-danger"
+                  onClick={() => removeQuestion(i)}
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+
+            <div className="mb-3">
+              <label className="form-label">Question Text</label>
+              <input
+                className="form-control"
+                value={q.question}
+                onChange={(e) => changeQuestion(i, "question", e.target.value)}
+              />
+            </div>
+
+            <label className="form-label">Options</label>
+            {q.choices.map((opt, j) => (
+              <div key={j} className="input-group mb-2">
+                <div className="input-group-text">
+                  <input
+                    type="radio"
+                    name={`q-${i}`}
+                    checked={q.answer === j}
+                    onChange={() => changeQuestion(i, "answer", j)}
+                  />
+                </div>
+                <input
+                  className="form-control"
+                  value={opt}
+                  onChange={(e) => changeQuestion(i, "choices", 
+                    q.choices.map((o, k) => k === j ? e.target.value : o)
+                  )}
+                />
+                {q.choices.length > 2 && (
+                  <button
+                    className="btn btn-outline-danger"
+                    onClick={() => removeOption(i, j)}
+                  >
+                    ×
+                  </button>
                 )}
               </div>
-              <input
-                className="form-control mb-2"
-                value={q.question}
-                onChange={e => handleCompQuestionChange(i, "question", e.target.value)}
-                placeholder="Type the question"
-              />
-              <div>
-                {q.options.map((opt, j) => (
-                  <div key={j} className="input-group mb-1">
-                    <span className="input-group-text">
-                      <input
-                        type="radio"
-                        name={`correct${i}`}
-                        checked={q.correct === j}
-                        onChange={() => handleCompCorrectChange(i, j)}
-                      />
-                    </span>
-                    <input
-                      className="form-control"
-                      value={opt}
-                      placeholder={`Option ${j + 1}${j > 1 ? " (Optional)" : ""}`}
-                      onChange={e => handleCompOptionChange(i, j, e.target.value)}
-                    />
-                  </div>
-                ))}
-                <button
-                  className="btn btn-link"
-                  type="button"
-                  onClick={() => addCompOption(i)}
-                >
-                  + Add Option
-                </button>
-              </div>
-            </div>
-          ))}
-          <button
-            className="btn btn-link"
-            type="button"
-            onClick={addCompQuestion}
-          >
-            + Add MCQ
-          </button>
-        </div>
-      </div>
-      <hr />
+            ))}
 
-      <button className="btn btn-primary" onClick={handlePreview}>
-        Save
-      </button>
+            <button
+              className="btn btn-outline-secondary"
+              onClick={() => changeQuestion(i, "choices", [...q.choices, ""])}
+            >
+              Add Option
+            </button>
+          </div>
+        ))}
+
+        <button
+          className="btn btn-outline-primary"
+          onClick={addNewQuestion}
+        >
+          Add Question
+        </button>
+      </div>
+
+      <div className="d-flex justify-content-end mt-4">
+        <button 
+          className="btn btn-primary px-4 py-2"
+          onClick={showFormPreview}
+        >
+          Preview Form
+        </button>
+      </div>
     </div>
   );
 }

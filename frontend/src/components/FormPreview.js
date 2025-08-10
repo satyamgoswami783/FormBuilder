@@ -1,94 +1,181 @@
 import React from "react";
 
-export default function FormPreview({
-  title,
-  description,
-  questions,
-  onBack,
-  onSubmit,
-}) {
-  return (
-    <div className="container mt-4">
-      <div style={{ borderBottom: "2px solid #673ab7", paddingBottom: 8, marginBottom: 16 }}>
-        <span style={{ fontWeight: "bold", fontSize: 22 }}>{title || "Untitled Quiz"}</span>
-        <button
-          className="btn btn-link float-end"
-          onClick={onBack}
-          style={{ marginRight: 10 }}
-        >
-          Edit
-        </button>
-        <button
-          className="btn btn-primary float-end"
-          onClick={onSubmit}
-          style={{ marginRight: 10 }}
-        >
-          Save & Proceed
-        </button>
-        <button
-          className="btn btn-outline-secondary float-end"
-          onClick={onSubmit}
-          style={{ marginRight: 10 }}
-        >
-          Save
-        </button>
-      </div>
+export default function FormPreview({ data, onBack, onSubmit }) {
+  const getGroupedClozeAnswers = () => {
+    const grouped = {};
+    const clozeQ = data.questions[1];
+    if (!clozeQ) return grouped;
+    
+    clozeQ.blankPositions.forEach((pos, i) => {
+      const word = clozeQ.clozeAnswers[i];
+      if (!grouped[word]) {
+        grouped[word] = [];
+      }
+      grouped[word].push(pos + 1);
+    });
+    return grouped;
+  };
 
-      {description && <p>{description}</p>}
+  const renderClozeSentence = () => {
+    const clozeQ = data.questions[1];
+    if (!clozeQ) return null;
+    
+    return clozeQ.clozeSentence.split(" ").map((word, i) => {
+      if (clozeQ.blankPositions.includes(i)) {
+        const answerIndex = clozeQ.blankPositions.indexOf(i);
+        const answer = clozeQ.clozeAnswers[answerIndex];
+        return (
+          <b key={i}>
+            [<span className="text-primary">{answer}</span>]
+          </b>
+        );
+      }
+      return <span key={i}> {word} </span>;
+    });
+  };
+
+  const groupedClozeAnswers = getGroupedClozeAnswers();
+
+  return (
+    <div className="container mt-4" style={{ maxWidth: "800px" }}>
+      <h2 className="mb-4">Form Preview</h2>
+      
+      <div className="card mb-4">
+        <div className="card-body">
+          {data.headerImage && (
+            <img 
+              src={data.headerImage} 
+              alt="Header" 
+              className="img-fluid mb-3 rounded"
+              style={{ maxHeight: "200px" }}
+            />
+          )}
+          <h3>{data.title}</h3>
+          <p className="text-muted">{data.description}</p>
+        </div>
+      </div>
 
       {/* Categorize Preview */}
-      <div className="mb-4" style={{ background: "#fff", borderRadius: 10, border: "1px solid #eee", padding: 20 }}>
-        <b>Question 1</b>
-        <span className="badge bg-info mx-2">Categorize</span>
-        <div style={{ margin: "10px 0" }}>{questions[0]?.text}</div>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Item</th>
-              <th>Belongs To</th>
-            </tr>
-          </thead>
-          <tbody>
-            {questions[0]?.items?.map((item, idx) => (
-              <tr key={idx}>
-                <td>{item.value}</td>
-                <td>{item.belongsTo}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {data.questions[0] && (
+        <div className="card mb-4">
+          <div className="card-body">
+            <h4>Categorization Question</h4>
+            <p>{data.questions[0].text}</p>
+            
+            {data.questions[0].image && (
+              <img 
+                src={data.questions[0].image} 
+                alt="Question" 
+                className="img-fluid mb-3 rounded"
+                style={{ maxHeight: "200px" }}
+              />
+            )}
+            
+            <table className="table table-bordered">
+              <thead>
+                <tr>
+                  {data.questions[0].categories.map((cat, i) => (
+                    <th key={i}>{cat}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  {data.questions[0].categories.map((cat, i) => (
+                    <td key={i}>
+                      <ul className="list-unstyled">
+                        {data.questions[0].items
+                          .filter(item => item.belongsTo === cat)
+                          .map((item, j) => (
+                            <li key={j}>{item.value}</li>
+                          ))}
+                      </ul>
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Cloze Preview */}
-      <div className="mb-4" style={{ background: "#fff", borderRadius: 10, border: "1px solid #eee", padding: 20 }}>
-        <b>Question 2</b>
-        <span className="badge bg-info mx-2">Cloze</span>
-        <div>
-          <b>Sentence:</b> {questions[1]?.clozeSentence}
+      {data.questions[1] && (
+        <div className="card mb-4">
+          <div className="card-body">
+            <h4>Fill-in-the-Blanks</h4>
+            <div className="p-3 bg-light rounded mb-3">
+              {renderClozeSentence()}
+            </div>
+            <div>
+              <h5>Blank Answers:</h5>
+              {Object.entries(groupedClozeAnswers).length > 0 ? (
+                <div className="mt-3">
+                  {Object.entries(groupedClozeAnswers).map(([word, positions]) => (
+                    <div key={word} className="mb-3 p-3 border rounded">
+                      <div className="d-flex justify-content-between align-items-center mb-2">
+                        <strong>{word}</strong>
+                        <span className="badge bg-primary">
+                          {positions.length} blank{positions.length > 1 ? 's' : ''}
+                        </span>
+                      </div>
+                      <div className="ms-3">
+                        {positions.map((pos, i) => (
+                          <div key={i} className="mb-1">
+                            Position {pos}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted">No blanks added</p>
+              )}
+            </div>
+          </div>
         </div>
-        <div>
-          <b>Answers:</b> {questions[1]?.clozeAnswers?.join(", ")}
-        </div>
-      </div>
+      )}
 
       {/* Comprehension Preview */}
-      <div className="mb-4" style={{ background: "#fff", borderRadius: 10, border: "1px solid #eee", padding: 20 }}>
-        <b>Question 3</b>
-        <span className="badge bg-info mx-2">Comprehension</span>
-        <div style={{ whiteSpace: "pre-wrap" }}>{questions[2]?.passage}</div>
-        {questions[2]?.mcqs?.map((mcq, idx) => (
-          <div key={idx} className="mt-3">
-            <b>Q3.{idx + 1} {mcq.question}</b>
-            <ul>
-              {mcq.options.map((opt, oidx) => (
-                <li key={oidx} style={{ color: mcq.correct === oidx ? "green" : undefined }}>
-                  {opt} {mcq.correct === oidx ? "(correct)" : ""}
-                </li>
-              ))}
-            </ul>
+      {data.questions[2] && (
+        <div className="card mb-4">
+          <div className="card-body">
+            <h4>Reading Comprehension</h4>
+            <div className="p-3 bg-light rounded mb-3">
+              {data.questions[2].passage}
+            </div>
+            
+            {data.questions[2].mcqs.map((mcq, i) => (
+              <div key={i} className="mb-3 p-3 border rounded">
+                <p><strong>{mcq.question}</strong></p>
+                <ul className="list-unstyled">
+                  {mcq.options.map((opt, j) => (
+                    <li key={j} className={mcq.answer === j ? "text-success fw-bold" : ""}>
+                      {opt} {mcq.answer === j && "✓"}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
-        ))}
+        </div>
+      )}
+
+      <div className="d-flex justify-content-between mt-4">
+        <button 
+          className="btn btn-outline-secondary px-4 py-2"
+          onClick={onBack}
+        >
+          Back to Editor
+        </button>
+        <button 
+          className="btn btn-primary px-4 py-2"
+          onClick={onSubmit}
+        >
+          Save Form
+        </button>
       </div>
     </div>
   );
-}
+} 

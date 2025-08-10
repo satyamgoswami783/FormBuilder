@@ -10,8 +10,11 @@ const responseRoutes = require('./routes/responseRoutes');
 const app = express();
 
 const _dirname = path.resolve();
+// In your server.js file, update CORS:
 app.use(cors({
-  origin : "https://formbuilder-1-domz.onrender.com",
+  
+ origin: "http://localhost:3000" ,
+    
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
