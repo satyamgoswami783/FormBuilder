@@ -13,7 +13,7 @@ const _dirname = path.resolve();
 // In your server.js file, update CORS:
 app.use(cors({
   
- origin: "http://localhost:3000" ,
+ origin: "https://formbuilder-2-6e62.onrender.com/" ,
     
   credentials: true
 }));
