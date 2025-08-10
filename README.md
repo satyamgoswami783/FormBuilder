@@ -49,7 +49,7 @@ A responsive web application for creating, previewing, and filling forms with th
 
 1. **Clone the repository**
    
-   git clone [https://github.com/yourusername/custom-form-builder](https://github.com/Jash-1th/FormBuilder).git
+   git clone https://github.com/Jash-1th/FormBuilder.git
    cd custom-form-builder
 2. **Set up backend**
    cd backend
