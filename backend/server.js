@@ -13,7 +13,7 @@ const _dirname = path.resolve();
 
 app.use(cors({
   
- origin: "http://localhost:3000/" ,
+ origin: "https://formbuilderr.onrender.com/" ,
     
   credentials: true
 }));
